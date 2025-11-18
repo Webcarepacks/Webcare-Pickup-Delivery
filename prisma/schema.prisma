@@ -36,7 +36,19 @@ model Location {
   shopDomain  String
   name        String
   address     String
+  apartment   String?
+  city        String?
+  zipcode     String?
+  province    String?
+  country     String?
   active      Boolean  @default(true)
+  showAddress    Boolean @default(true)
+  showCity       Boolean @default(true)
+  showProvince   Boolean @default(true)
+  showPostalCode Boolean @default(true)
+  showCountry    Boolean @default(true)
+  offersPickup   Boolean @default(false)
+  offersDelivery Boolean @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
