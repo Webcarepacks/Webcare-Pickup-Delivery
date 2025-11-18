@@ -60,7 +60,7 @@ export default function LocationsPage() {
             />
           </label>
           <div>
-            <s-button variant="primary" submit>
+            <s-button variant="primary" type="submit">
               Locatie opslaan
             </s-button>
           </div>
