@@ -1,0 +1,13 @@
+-- AlterTable
+ALTER TABLE "Location" ADD COLUMN "apartment" TEXT;
+ALTER TABLE "Location" ADD COLUMN "city" TEXT;
+ALTER TABLE "Location" ADD COLUMN "zipcode" TEXT;
+ALTER TABLE "Location" ADD COLUMN "province" TEXT;
+ALTER TABLE "Location" ADD COLUMN "country" TEXT;
+ALTER TABLE "Location" ADD COLUMN "showAddress" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "Location" ADD COLUMN "showCity" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "Location" ADD COLUMN "showProvince" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "Location" ADD COLUMN "showPostalCode" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "Location" ADD COLUMN "showCountry" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "Location" ADD COLUMN "offersPickup" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Location" ADD COLUMN "offersDelivery" BOOLEAN NOT NULL DEFAULT false;
