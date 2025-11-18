@@ -30,3 +30,15 @@ model Session {
   collaborator  Boolean?  @default(false)
   emailVerified Boolean?  @default(false)
 }
+
+model Location {
+  id          Int      @id @default(autoincrement())
+  shopDomain  String
+  name        String
+  address     String
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([shopDomain])
+}
