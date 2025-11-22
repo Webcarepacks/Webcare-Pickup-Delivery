@@ -439,7 +439,18 @@ export default function LocationsPage() {
                     {renderAddress(location)}
                   </p>
                   <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                    <Form method="post">
+                    <Form
+                      method="post"
+                      onSubmit={(event) => {
+                        if (
+                          !window.confirm(
+                            "Are you sure you want to delete this location?",
+                          )
+                        ) {
+                          event.preventDefault();
+                        }
+                      }}
+                    >
                       <input type="hidden" name="intent" value="delete" />
                       <input type="hidden" name="locationId" value={location.id} />
                       <s-button type="submit" variant="secondary">Delete</s-button>
