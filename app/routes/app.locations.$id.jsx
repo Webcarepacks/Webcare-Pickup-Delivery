@@ -1,45 +1,33 @@
-import { useLoaderData, useActionData, Form } from "react-router";
-import { prisma } from "../db.server";
+import { redirect, useLoaderData, useActionData, Form } from "react-router";
 import { authenticate } from "../shopify.server";
+import { prisma } from "../db.server";
 
-export const loader = async ({ request }) => {
+export const loader = async ({ request, params }) => {
   const { session } = await authenticate.admin(request);
   const shopDomain = session?.shop;
+  const id = Number(params.id);
 
-  const locations = await prisma.location.findMany({
-    where: { shopDomain },
-    orderBy: { createdAt: "desc" },
+  const location = await prisma.location.findFirst({
+    where: { id, shopDomain },
   });
 
-  return { locations };
+  if (!location) {
+    throw new Response("Not found", { status: 404 });
+  }
+
+  return { location };
 };
 
-export const action = async ({ request }) => {
+export const action = async ({ request, params }) => {
   const { session } = await authenticate.admin(request);
   const shopDomain = session?.shop;
-  const formData = await request.formData();
-  const intent = formData.get("intent");
+  const id = Number(params.id);
 
-  if (intent === "delete") {
-    const locationId = formData.get("locationId");
-    const id = Number(locationId);
-
-    if (!locationId || Number.isNaN(id)) {
-      return { error: "Invalid location id." };
-    }
-
-    const location = await prisma.location.findFirst({
-      where: { id, shopDomain },
-    });
-
-    if (!location) {
-      return { error: "Invalid location id." };
-    }
-
-    await prisma.location.delete({ where: { id } });
-
-    return { deleted: true };
+  if (Number.isNaN(id)) {
+    return { error: "Invalid location id." };
   }
+
+  const formData = await request.formData();
 
   const readText = (field, required = false) => {
     const value = formData.get(field);
@@ -90,9 +78,17 @@ export const action = async ({ request }) => {
     return { error: "Location name and address are required.", fields };
   }
 
-  await prisma.location.create({
+  const location = await prisma.location.findFirst({
+    where: { id, shopDomain },
+  });
+
+  if (!location) {
+    return { error: "Location not found.", fields };
+  }
+
+  await prisma.location.update({
+    where: { id },
     data: {
-      shopDomain,
       name,
       address,
       apartment,
@@ -110,82 +106,21 @@ export const action = async ({ request }) => {
     },
   });
 
-  return { success: "Location saved." };
+  throw redirect("/app/locations");
 };
 
-export default function LocationsPage() {
-  const { locations } = useLoaderData();
+export default function EditLocationPage() {
+  const { location } = useLoaderData();
   const actionData = useActionData();
 
-  const defaultFields = {
-    name: "",
-    address: "",
-    apartment: "",
-    city: "",
-    zipcode: "",
-    province: "",
-    country: "",
-    showAddress: true,
-    showCity: true,
-    showProvince: true,
-    showPostalCode: true,
-    showCountry: true,
-    offersPickup: false,
-    offersDelivery: false,
-  };
-
   const formValues = {
-    ...defaultFields,
+    ...location,
     ...(actionData?.fields ?? {}),
   };
 
-  const badgeBaseStyle = {
-    display: "inline-flex",
-    alignItems: "center",
-    padding: "2px 10px",
-    borderRadius: "999px",
-    fontSize: "12px",
-    fontWeight: 600,
-  };
-
-  const renderAddress = (location) => {
-    const lines = [location.address].filter(Boolean);
-    if (location.apartment) {
-      lines.push(location.apartment);
-    }
-    const cityZip = [location.city, location.zipcode].filter(Boolean).join(" ");
-    if (cityZip) {
-      lines.push(cityZip);
-    }
-    const provinceCountry = [location.province, location.country]
-      .filter(Boolean)
-      .join(", ");
-    if (provinceCountry) {
-      lines.push(provinceCountry);
-    }
-    return lines.join("\n");
-  };
-
   return (
-    <s-page title="Pickup locations">
+    <s-page title="Edit location">
       <div style={{ padding: "24px", display: "grid", gap: "24px" }}>
-        <div
-          style={{
-            borderRadius: "12px",
-            background: "#ebf5ff",
-            border: "1px solid #90c2ff",
-            padding: "16px",
-            color: "#1e3a8a",
-          }}
-        >
-          <strong style={{ display: "block", marginBottom: "4px" }}>
-            Custom locations are not tracked by Shopify.
-          </strong>
-          <span>
-            Custom locations will appear as pickup/delivery options within the storefront widget only.
-          </span>
-        </div>
-
         <Form
           method="post"
           style={{
@@ -199,7 +134,7 @@ export default function LocationsPage() {
           }}
         >
           <div style={{ display: "grid", gap: "12px" }}>
-            <h2 style={{ margin: 0 }}>Create a custom location</h2>
+            <h2 style={{ margin: 0 }}>Update location</h2>
             {actionData?.error && (
               <div
                 style={{
@@ -211,19 +146,6 @@ export default function LocationsPage() {
                 }}
               >
                 {actionData.error}
-              </div>
-            )}
-            {actionData?.success && (
-              <div
-                style={{
-                  background: "#dcfce7",
-                  border: "1px solid #86efac",
-                  borderRadius: "8px",
-                  padding: "12px",
-                  color: "#14532d",
-                }}
-              >
-                {actionData.success}
               </div>
             )}
           </div>
@@ -265,7 +187,7 @@ export default function LocationsPage() {
               <input
                 name="apartment"
                 type="text"
-                defaultValue={formValues.apartment}
+                defaultValue={formValues.apartment ?? ""}
                 placeholder="Unit 4B"
                 style={{
                   borderRadius: "8px",
@@ -281,7 +203,7 @@ export default function LocationsPage() {
                 <input
                   name="city"
                   type="text"
-                  defaultValue={formValues.city}
+                  defaultValue={formValues.city ?? ""}
                   style={{
                     borderRadius: "8px",
                     border: "1px solid #cbd5f5",
@@ -294,7 +216,7 @@ export default function LocationsPage() {
                 <input
                   name="zipcode"
                   type="text"
-                  defaultValue={formValues.zipcode}
+                  defaultValue={formValues.zipcode ?? ""}
                   style={{
                     borderRadius: "8px",
                     border: "1px solid #cbd5f5",
@@ -310,7 +232,7 @@ export default function LocationsPage() {
                 <input
                   name="province"
                   type="text"
-                  defaultValue={formValues.province}
+                  defaultValue={formValues.province ?? ""}
                   style={{
                     borderRadius: "8px",
                     border: "1px solid #cbd5f5",
@@ -323,7 +245,7 @@ export default function LocationsPage() {
                 <input
                   name="country"
                   type="text"
-                  defaultValue={formValues.country}
+                  defaultValue={formValues.country ?? ""}
                   style={{
                     borderRadius: "8px",
                     border: "1px solid #cbd5f5",
@@ -345,7 +267,7 @@ export default function LocationsPage() {
                 { label: "Show country", name: "showCountry", checked: formValues.showCountry },
               ].map((option) => (
                 <label key={option.name} style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                  <input type="checkbox" name={option.name} defaultChecked={option.checked} />
+                  <input type="checkbox" name={option.name} defaultChecked={Boolean(option.checked)} />
                   <span>{option.label}</span>
                 </label>
               ))}
@@ -355,122 +277,24 @@ export default function LocationsPage() {
           <div style={{ display: "grid", gap: "12px" }}>
             <h3 style={{ margin: 0 }}>Offerings</h3>
             <label style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-              <input type="checkbox" name="offersPickup" defaultChecked={formValues.offersPickup} />
+              <input type="checkbox" name="offersPickup" defaultChecked={Boolean(formValues.offersPickup)} />
               <span>This location offers local pickup</span>
             </label>
             <label style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-              <input type="checkbox" name="offersDelivery" defaultChecked={formValues.offersDelivery} />
+              <input type="checkbox" name="offersDelivery" defaultChecked={Boolean(formValues.offersDelivery)} />
               <span>This location offers local delivery</span>
             </label>
           </div>
 
-          <div>
+          <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
             <s-button type="submit" variant="primary">
-              Save location
+              Save changes
             </s-button>
+            <a href="/app/locations" style={{ color: "#334155", textDecoration: "none" }}>
+              Cancel
+            </a>
           </div>
         </Form>
-
-        <section
-          style={{
-            border: "1px solid #e3e8ef",
-            borderRadius: "16px",
-            padding: "24px",
-            background: "white",
-            boxShadow: "0 1px 2px rgba(15, 23, 42, 0.08)",
-          }}
-        >
-          <h2 style={{ marginTop: 0 }}>Existing locations</h2>
-          {locations.length === 0 ? (
-            <p style={{ color: "#64748b" }}>No custom locations yet.</p>
-          ) : (
-            <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: "16px" }}>
-              {locations.map((location) => (
-                <li
-                  key={location.id}
-                  style={{
-                    border: "1px solid #e2e8f0",
-                    borderRadius: "12px",
-                    padding: "16px",
-                    background: "#f8fafc",
-                    display: "grid",
-                    gap: "8px",
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: "8px", flexWrap: "wrap" }}>
-                    <strong style={{ fontSize: "16px" }}>{location.name}</strong>
-                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                      {location.active && (
-                        <span
-                          style={{
-                            ...badgeBaseStyle,
-                            background: "#dcfce7",
-                            color: "#166534",
-                          }}
-                        >
-                          Active
-                        </span>
-                      )}
-                      {location.offersPickup && (
-                        <span
-                          style={{
-                            ...badgeBaseStyle,
-                            background: "#e0f2fe",
-                            color: "#075985",
-                          }}
-                        >
-                          Pickup
-                        </span>
-                      )}
-                      {location.offersDelivery && (
-                        <span
-                          style={{
-                            ...badgeBaseStyle,
-                            background: "#fef9c3",
-                            color: "#92400e",
-                          }}
-                        >
-                          Delivery
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <p style={{ whiteSpace: "pre-line", margin: 0, color: "#334155" }}>
-                    {renderAddress(location)}
-                  </p>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "flex-end",
-                      gap: "8px",
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <Form method="get" action={`/app/locations/${location.id}`}>
-                      <s-button type="submit" variant="secondary">Edit</s-button>
-                    </Form>
-                    <Form
-                      method="post"
-                      onSubmit={(event) => {
-                        if (
-                          !window.confirm(
-                            "Are you sure you want to delete this location?",
-                          )
-                        ) {
-                          event.preventDefault();
-                        }
-                      }}
-                    >
-                      <input type="hidden" name="intent" value="delete" />
-                      <input type="hidden" name="locationId" value={location.id} />
-                      <s-button type="submit" variant="secondary">Delete</s-button>
-                    </Form>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
       </div>
     </s-page>
   );
