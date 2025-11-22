@@ -18,6 +18,28 @@ export const action = async ({ request }) => {
   const { session } = await authenticate.admin(request);
   const shopDomain = session?.shop;
   const formData = await request.formData();
+  const intent = formData.get("intent");
+
+  if (intent === "delete") {
+    const locationId = formData.get("locationId");
+    const id = Number(locationId);
+
+    if (!locationId || Number.isNaN(id)) {
+      return { error: "Invalid location id." };
+    }
+
+    const location = await prisma.location.findFirst({
+      where: { id, shopDomain },
+    });
+
+    if (!location) {
+      return { error: "Invalid location id." };
+    }
+
+    await prisma.location.delete({ where: { id } });
+
+    return { deleted: true };
+  }
 
   const readText = (field, required = false) => {
     const value = formData.get(field);
@@ -416,6 +438,13 @@ export default function LocationsPage() {
                   <p style={{ whiteSpace: "pre-line", margin: 0, color: "#334155" }}>
                     {renderAddress(location)}
                   </p>
+                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                    <Form method="post">
+                      <input type="hidden" name="intent" value="delete" />
+                      <input type="hidden" name="locationId" value={location.id} />
+                      <s-button type="submit" variant="secondary">Delete</s-button>
+                    </Form>
+                  </div>
                 </li>
               ))}
             </ul>
