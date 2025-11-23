@@ -1,4 +1,4 @@
-import { useLoaderData, useActionData, Form } from "react-router";
+import { useLoaderData, useActionData, Form, Link } from "react-router";
 import { prisma } from "../db.server";
 import { authenticate } from "../shopify.server";
 
@@ -446,9 +446,9 @@ export default function LocationsPage() {
                       flexWrap: "wrap",
                     }}
                   >
-                    <Form method="get" action={`/app/locations/${location.id}`}>
-                      <s-button type="submit" variant="secondary">Edit</s-button>
-                    </Form>
+                    <Link to={`/app/locations/${location.id}`} style={{ textDecoration: "none" }}>
+                      <s-button type="button" variant="secondary">Edit</s-button>
+                    </Link>
                     <Form
                       method="post"
                       onSubmit={(event) => {
