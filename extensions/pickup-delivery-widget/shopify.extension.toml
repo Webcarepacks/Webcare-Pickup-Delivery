@@ -1,0 +1,5 @@
+name = "pickup-delivery-widget"
+type = "theme"
+
+[extensions.theme]
+handle = "pickup-delivery-widget"

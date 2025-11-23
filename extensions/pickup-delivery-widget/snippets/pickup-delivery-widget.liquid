@@ -1,0 +1,49 @@
+<div id="pickup-delivery-widget" data-proxy-url="{{ shop.url }}/apps/pickup-delivery">
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', async function() {
+    const el = document.getElementById('pickup-delivery-widget');
+    if (!el) return;
+
+    const proxyUrl = el.getAttribute('data-proxy-url');
+    try {
+      const res = await fetch(proxyUrl);
+      const json = await res.json();
+      const locations = json.locations || [];
+
+      if (!locations.length) {
+        el.innerHTML = '<p>No pickup locations available.</p>';
+        return;
+      }
+
+      const select = document.createElement('select');
+      select.name = 'attributes[pickup_location]';
+      select.style.minWidth = '240px';
+
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = 'Select pickup location';
+      select.appendChild(placeholder);
+
+      locations.forEach(loc => {
+        const opt = document.createElement('option');
+        opt.value = loc.id;
+        opt.textContent = loc.name;
+        select.appendChild(opt);
+      });
+
+      const label = document.createElement('label');
+      label.textContent = 'Pickup location';
+      label.style.display = 'block';
+      label.style.marginBottom = '4px';
+
+      el.innerHTML = '';
+      el.appendChild(label);
+      el.appendChild(select);
+    } catch (e) {
+      console.error('Pickup widget error', e);
+      el.innerHTML = '<p>Pickup options currently unavailable.</p>';
+    }
+  });
+</script>

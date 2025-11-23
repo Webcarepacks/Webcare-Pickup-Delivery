@@ -1,58 +1,39 @@
-import { useLoaderData, useActionData, Form } from "react-router";
+import { Form, useActionData, useLoaderData } from "react-router";
 import { prisma } from "../db.server";
 import { authenticate } from "../shopify.server";
 
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
-  const shopDomain = session?.shop;
-  const url = new URL(request.url);
-  const status = url.searchParams.get("status");
+  const shopDomain = session.shop;
 
   const locations = await prisma.location.findMany({
     where: { shopDomain },
     orderBy: { createdAt: "desc" },
   });
 
-  return { locations, status };
+  return { locations };
 };
 
 export const action = async ({ request }) => {
   const { session } = await authenticate.admin(request);
-  const shopDomain = session?.shop;
+  const shopDomain = session.shop;
   const formData = await request.formData();
   const intent = formData.get("intent");
 
   if (intent === "delete") {
-    const locationId = formData.get("locationId");
-    const id = Number(locationId);
-
-    if (!locationId || Number.isNaN(id)) {
-      return { error: "Invalid location id." };
-    }
-
-    const location = await prisma.location.findFirst({
-      where: { id, shopDomain },
-    });
-
-    if (!location) {
+    const id = Number(formData.get("locationId"));
+    if (!id || Number.isNaN(id)) {
       return { error: "Invalid location id." };
     }
 
     await prisma.location.delete({ where: { id } });
-
     return { deleted: true };
   }
 
   const readText = (field, required = false) => {
-    const value = formData.get(field);
-    if (!value) {
-      return null;
-    }
-    const text = value.toString().trim();
-    if (!text && required) {
-      return null;
-    }
-    return text || null;
+    const value = formData.get(field)?.toString().trim();
+    if (!value) return required ? null : null;
+    return value || null;
   };
 
   const name = readText("name", true);
@@ -71,25 +52,8 @@ export const action = async ({ request }) => {
   const offersPickup = formData.get("offersPickup") === "on";
   const offersDelivery = formData.get("offersDelivery") === "on";
 
-  const fields = {
-    name: formData.get("name")?.toString() ?? "",
-    address: formData.get("address")?.toString() ?? "",
-    apartment: formData.get("apartment")?.toString() ?? "",
-    city: formData.get("city")?.toString() ?? "",
-    zipcode: formData.get("zipcode")?.toString() ?? "",
-    province: formData.get("province")?.toString() ?? "",
-    country: formData.get("country")?.toString() ?? "",
-    showAddress,
-    showCity,
-    showProvince,
-    showPostalCode,
-    showCountry,
-    offersPickup,
-    offersDelivery,
-  };
-
   if (!name || !address) {
-    return { error: "Location name and address are required.", fields };
+    return { error: "Location name and address are required." };
   }
 
   await prisma.location.create({
@@ -112,36 +76,14 @@ export const action = async ({ request }) => {
     },
   });
 
-  return { success: "Location saved." };
+  return { success: true };
 };
 
 export default function LocationsPage() {
-  const { locations, status } = useLoaderData();
+  const { locations } = useLoaderData();
   const actionData = useActionData();
 
-  const defaultFields = {
-    name: "",
-    address: "",
-    apartment: "",
-    city: "",
-    zipcode: "",
-    province: "",
-    country: "",
-    showAddress: true,
-    showCity: true,
-    showProvince: true,
-    showPostalCode: true,
-    showCountry: true,
-    offersPickup: false,
-    offersDelivery: false,
-  };
-
-  const formValues = {
-    ...defaultFields,
-    ...(actionData?.fields ?? {}),
-  };
-
-  const badgeBaseStyle = {
+  const badgeStyle = {
     display: "inline-flex",
     alignItems: "center",
     padding: "2px 10px",
@@ -152,67 +94,19 @@ export default function LocationsPage() {
 
   const renderAddress = (location) => {
     const lines = [location.address].filter(Boolean);
-    if (location.apartment) {
-      lines.push(location.apartment);
-    }
+    if (location.apartment) lines.push(location.apartment);
     const cityZip = [location.city, location.zipcode].filter(Boolean).join(" ");
-    if (cityZip) {
-      lines.push(cityZip);
-    }
+    if (cityZip) lines.push(cityZip);
     const provinceCountry = [location.province, location.country]
       .filter(Boolean)
       .join(", ");
-    if (provinceCountry) {
-      lines.push(provinceCountry);
-    }
+    if (provinceCountry) lines.push(provinceCountry);
     return lines.join("\n");
   };
 
-  const statusMessage = (() => {
-    if (actionData?.success) {
-      return { tone: "success", message: actionData.success };
-    }
-
-    if (actionData?.deleted) {
-      return { tone: "success", message: "Location deleted." };
-    }
-
-    if (actionData?.error) {
-      return { tone: "critical", message: actionData.error };
-    }
-
-    if (status === "updated") {
-      return { tone: "success", message: "Location updated." };
-    }
-
-    if (status === "deleted") {
-      return { tone: "success", message: "Location deleted." };
-    }
-
-    return null;
-  })();
-
   return (
-    <s-page title="Locations">
+    <s-page title="Pickup locations">
       <div style={{ padding: "24px", display: "grid", gap: "24px" }}>
-        <div style={{ display: "flex", gap: "12px", flexDirection: "column" }}>
-          <p style={{ margin: 0, color: "#475569" }}>
-            Manage the pickup and delivery points shown in your storefront widget.
-            Use custom addresses for locations that are not tracked by Shopify.
-          </p>
-          {statusMessage && (
-            <s-box
-              borderRadius="base"
-              padding="base"
-              background={statusMessage.tone === "success" ? "success" : "critical"}
-              color={statusMessage.tone === "success" ? "on-success" : "on-critical"}
-              borderWidth="base"
-            >
-              {statusMessage.message}
-            </s-box>
-          )}
-        </div>
-
         <div
           style={{
             borderRadius: "12px",
@@ -229,6 +123,12 @@ export default function LocationsPage() {
             Custom locations will appear as pickup/delivery options within the storefront widget only.
           </span>
         </div>
+
+        {actionData?.error && (
+          <s-inline-stack align="start">
+            <s-badge tone="critical">{actionData.error}</s-badge>
+          </s-inline-stack>
+        )}
 
         <Form
           method="post"
@@ -252,7 +152,6 @@ export default function LocationsPage() {
               <input
                 name="name"
                 type="text"
-                defaultValue={formValues.name}
                 placeholder="e.g. Main street pickup"
                 style={{
                   borderRadius: "8px",
@@ -267,7 +166,6 @@ export default function LocationsPage() {
               <textarea
                 name="address"
                 rows={3}
-                defaultValue={formValues.address}
                 placeholder="123 Market Street"
                 style={{
                   borderRadius: "8px",
@@ -283,7 +181,6 @@ export default function LocationsPage() {
               <input
                 name="apartment"
                 type="text"
-                defaultValue={formValues.apartment}
                 placeholder="Unit 4B"
                 style={{
                   borderRadius: "8px",
@@ -293,13 +190,18 @@ export default function LocationsPage() {
               />
             </label>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gap: "16px",
+              }}
+            >
               <label style={{ display: "grid", gap: "6px" }}>
                 <span style={{ fontWeight: 600 }}>City</span>
                 <input
                   name="city"
                   type="text"
-                  defaultValue={formValues.city}
                   style={{
                     borderRadius: "8px",
                     border: "1px solid #cbd5f5",
@@ -312,7 +214,6 @@ export default function LocationsPage() {
                 <input
                   name="zipcode"
                   type="text"
-                  defaultValue={formValues.zipcode}
                   style={{
                     borderRadius: "8px",
                     border: "1px solid #cbd5f5",
@@ -322,13 +223,18 @@ export default function LocationsPage() {
               </label>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gap: "16px",
+              }}
+            >
               <label style={{ display: "grid", gap: "6px" }}>
                 <span style={{ fontWeight: 600 }}>Province</span>
                 <input
                   name="province"
                   type="text"
-                  defaultValue={formValues.province}
                   style={{
                     borderRadius: "8px",
                     border: "1px solid #cbd5f5",
@@ -337,11 +243,10 @@ export default function LocationsPage() {
                 />
               </label>
               <label style={{ display: "grid", gap: "6px" }}>
-                <span style={{ fontWeight: 600 }}>Country</span>
+                <span style={{ fontWeight: 600 }}>Country/region</span>
                 <input
                   name="country"
                   type="text"
-                  defaultValue={formValues.country}
                   style={{
                     borderRadius: "8px",
                     border: "1px solid #cbd5f5",
@@ -356,13 +261,16 @@ export default function LocationsPage() {
             <h3 style={{ margin: 0 }}>Display options</h3>
             <div style={{ display: "grid", gap: "8px" }}>
               {[
-                { label: "Show address", name: "showAddress", checked: formValues.showAddress },
-                { label: "Show city", name: "showCity", checked: formValues.showCity },
-                { label: "Show province", name: "showProvince", checked: formValues.showProvince },
-                { label: "Show postal code", name: "showPostalCode", checked: formValues.showPostalCode },
-                { label: "Show country", name: "showCountry", checked: formValues.showCountry },
+                { label: "Show address", name: "showAddress", checked: true },
+                { label: "Show city", name: "showCity", checked: true },
+                { label: "Show province", name: "showProvince", checked: true },
+                { label: "Show postal code", name: "showPostalCode", checked: true },
+                { label: "Show country", name: "showCountry", checked: true },
               ].map((option) => (
-                <label key={option.name} style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                <label
+                  key={option.name}
+                  style={{ display: "flex", gap: "8px", alignItems: "center" }}
+                >
                   <input type="checkbox" name={option.name} defaultChecked={option.checked} />
                   <span>{option.label}</span>
                 </label>
@@ -373,11 +281,11 @@ export default function LocationsPage() {
           <div style={{ display: "grid", gap: "12px" }}>
             <h3 style={{ margin: 0 }}>Offerings</h3>
             <label style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-              <input type="checkbox" name="offersPickup" defaultChecked={formValues.offersPickup} />
+              <input type="checkbox" name="offersPickup" />
               <span>This location offers local pickup</span>
             </label>
             <label style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-              <input type="checkbox" name="offersDelivery" defaultChecked={formValues.offersDelivery} />
+              <input type="checkbox" name="offersDelivery" />
               <span>This location offers local delivery</span>
             </label>
           </div>
@@ -402,10 +310,12 @@ export default function LocationsPage() {
           {locations.length === 0 ? (
             <p style={{ color: "#64748b" }}>No custom locations yet.</p>
           ) : (
-            <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: "16px" }}>
-              {locations.map((location) => (
+            <ul
+              style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: "16px" }}
+            >
+              {locations.map((loc) => (
                 <li
-                  key={location.id}
+                  key={loc.id}
                   style={{
                     border: "1px solid #e2e8f0",
                     borderRadius: "12px",
@@ -415,13 +325,20 @@ export default function LocationsPage() {
                     gap: "8px",
                   }}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: "8px", flexWrap: "wrap" }}>
-                    <strong style={{ fontSize: "16px" }}>{location.name}</strong>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: "8px",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <strong style={{ fontSize: "16px" }}>{loc.name}</strong>
                     <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                      {location.active && (
+                      {loc.active && (
                         <span
                           style={{
-                            ...badgeBaseStyle,
+                            ...badgeStyle,
                             background: "#dcfce7",
                             color: "#166534",
                           }}
@@ -429,10 +346,10 @@ export default function LocationsPage() {
                           Active
                         </span>
                       )}
-                      {location.offersPickup && (
+                      {loc.offersPickup && (
                         <span
                           style={{
-                            ...badgeBaseStyle,
+                            ...badgeStyle,
                             background: "#e0f2fe",
                             color: "#075985",
                           }}
@@ -440,10 +357,10 @@ export default function LocationsPage() {
                           Pickup
                         </span>
                       )}
-                      {location.offersDelivery && (
+                      {loc.offersDelivery && (
                         <span
                           style={{
-                            ...badgeBaseStyle,
+                            ...badgeStyle,
                             background: "#fef9c3",
                             color: "#92400e",
                           }}
@@ -454,7 +371,7 @@ export default function LocationsPage() {
                     </div>
                   </div>
                   <p style={{ whiteSpace: "pre-line", margin: 0, color: "#334155" }}>
-                    {renderAddress(location)}
+                    {renderAddress(loc)}
                   </p>
                   <div
                     style={{
@@ -464,24 +381,22 @@ export default function LocationsPage() {
                       flexWrap: "wrap",
                     }}
                   >
-                    <s-button href={`/app/locations/${location.id}`} variant="secondary">
+                    <s-button href={`/app/locations/${loc.id}`} variant="secondary">
                       Edit
                     </s-button>
                     <Form
                       method="post"
                       onSubmit={(event) => {
-                        if (
-                          !window.confirm(
-                            "Are you sure you want to delete this location?",
-                          )
-                        ) {
+                        if (!window.confirm("Are you sure you want to delete this location?")) {
                           event.preventDefault();
                         }
                       }}
                     >
                       <input type="hidden" name="intent" value="delete" />
-                      <input type="hidden" name="locationId" value={location.id} />
-                      <s-button type="submit" variant="secondary">Delete</s-button>
+                      <input type="hidden" name="locationId" value={loc.id} />
+                      <s-button type="submit" tone="critical" variant="secondary" size="slim">
+                        Delete
+                      </s-button>
                     </Form>
                   </div>
                 </li>
