@@ -5,13 +5,15 @@ import { authenticate } from "../shopify.server";
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
   const shopDomain = session?.shop;
+  const url = new URL(request.url);
+  const status = url.searchParams.get("status");
 
   const locations = await prisma.location.findMany({
     where: { shopDomain },
     orderBy: { createdAt: "desc" },
   });
 
-  return { locations };
+  return { locations, status };
 };
 
 export const action = async ({ request }) => {
@@ -114,7 +116,7 @@ export const action = async ({ request }) => {
 };
 
 export default function LocationsPage() {
-  const { locations } = useLoaderData();
+  const { locations, status } = useLoaderData();
   const actionData = useActionData();
 
   const defaultFields = {
@@ -166,9 +168,51 @@ export default function LocationsPage() {
     return lines.join("\n");
   };
 
+  const statusMessage = (() => {
+    if (actionData?.success) {
+      return { tone: "success", message: actionData.success };
+    }
+
+    if (actionData?.deleted) {
+      return { tone: "success", message: "Location deleted." };
+    }
+
+    if (actionData?.error) {
+      return { tone: "critical", message: actionData.error };
+    }
+
+    if (status === "updated") {
+      return { tone: "success", message: "Location updated." };
+    }
+
+    if (status === "deleted") {
+      return { tone: "success", message: "Location deleted." };
+    }
+
+    return null;
+  })();
+
   return (
-    <s-page title="Pickup locations">
+    <s-page title="Locations">
       <div style={{ padding: "24px", display: "grid", gap: "24px" }}>
+        <div style={{ display: "flex", gap: "12px", flexDirection: "column" }}>
+          <p style={{ margin: 0, color: "#475569" }}>
+            Manage the pickup and delivery points shown in your storefront widget.
+            Use custom addresses for locations that are not tracked by Shopify.
+          </p>
+          {statusMessage && (
+            <s-box
+              borderRadius="base"
+              padding="base"
+              background={statusMessage.tone === "success" ? "success" : "critical"}
+              color={statusMessage.tone === "success" ? "on-success" : "on-critical"}
+              borderWidth="base"
+            >
+              {statusMessage.message}
+            </s-box>
+          )}
+        </div>
+
         <div
           style={{
             borderRadius: "12px",
@@ -200,32 +244,6 @@ export default function LocationsPage() {
         >
           <div style={{ display: "grid", gap: "12px" }}>
             <h2 style={{ margin: 0 }}>Create a custom location</h2>
-            {actionData?.error && (
-              <div
-                style={{
-                  background: "#fee2e2",
-                  border: "1px solid #fca5a5",
-                  borderRadius: "8px",
-                  padding: "12px",
-                  color: "#991b1b",
-                }}
-              >
-                {actionData.error}
-              </div>
-            )}
-            {actionData?.success && (
-              <div
-                style={{
-                  background: "#dcfce7",
-                  border: "1px solid #86efac",
-                  borderRadius: "8px",
-                  padding: "12px",
-                  color: "#14532d",
-                }}
-              >
-                {actionData.success}
-              </div>
-            )}
           </div>
 
           <div style={{ display: "grid", gap: "16px" }}>

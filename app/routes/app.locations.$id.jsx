@@ -47,7 +47,7 @@ export async function action({ request, params }) {
       where: { id },
     });
 
-    return redirect("/app/locations");
+    return redirect("/app/locations?status=deleted");
   }
 
   const readText = (field, required = false) => {
@@ -120,7 +120,7 @@ export async function action({ request, params }) {
     },
   });
 
-  return redirect("/app/locations");
+  return redirect("/app/locations?status=updated");
 }
 
 export default function EditLocationPage() {
