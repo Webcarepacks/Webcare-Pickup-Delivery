@@ -2,39 +2,102 @@ import { redirect, useLoaderData, useActionData, Form } from "react-router";
 import { authenticate } from "../shopify.server";
 import { prisma } from "../db.server";
 
-export const loader = async ({ request, params }) => {
+export async function loader({ request, params }) {
   const { session } = await authenticate.admin(request);
   const shopDomain = session.shop;
   const id = Number(params.id);
+
+  if (!id || Number.isNaN(id)) {
+    throw new Response("Invalid location id", { status: 400 });
+  }
 
   const location = await prisma.location.findFirst({
     where: { id, shopDomain },
   });
 
   if (!location) {
-    throw new Response("Not found", { status: 404 });
+    throw new Response("Location not found", { status: 404 });
   }
 
   return { location };
-};
+}
 
-export const action = async ({ request, params }) => {
+export async function action({ request, params }) {
   const { session } = await authenticate.admin(request);
   const shopDomain = session.shop;
   const id = Number(params.id);
 
-  const formData = await request.formData();
+  if (!id || Number.isNaN(id)) {
+    return { error: "Invalid location id." };
+  }
 
-  const name = formData.get("name");
-  const address = formData.get("address");
-  const apartment = formData.get("apartment");
-  const city = formData.get("city");
-  const zipcode = formData.get("zipcode");
-  const province = formData.get("province");
-  const country = formData.get("country");
+  const formData = await request.formData();
+  const intent = formData.get("intent");
+
+  const location = await prisma.location.findFirst({
+    where: { id, shopDomain },
+  });
+
+  if (!location) {
+    return { error: "Invalid location id." };
+  }
+
+  if (intent === "delete") {
+    await prisma.location.delete({
+      where: { id },
+    });
+
+    return redirect("/app/locations");
+  }
+
+  const readText = (field, required = false) => {
+    const value = formData.get(field);
+    if (!value) {
+      return null;
+    }
+    const text = value.toString().trim();
+    if (!text && required) {
+      return null;
+    }
+    return text || null;
+  };
+
+  const name = readText("name", true);
+  const address = readText("address", true);
+  const apartment = readText("apartment");
+  const city = readText("city");
+  const zipcode = readText("zipcode");
+  const province = readText("province");
+  const country = readText("country");
+
+  const showAddress = formData.get("showAddress") === "on";
+  const showCity = formData.get("showCity") === "on";
+  const showProvince = formData.get("showProvince") === "on";
+  const showPostalCode = formData.get("showPostalCode") === "on";
+  const showCountry = formData.get("showCountry") === "on";
+  const offersPickup = formData.get("offersPickup") === "on";
+  const offersDelivery = formData.get("offersDelivery") === "on";
 
   if (!name || !address) {
-    return { error: "Location name and address are required." };
+    return {
+      error: "Location name and address are required.",
+      fields: {
+        name: formData.get("name")?.toString() ?? "",
+        address: formData.get("address")?.toString() ?? "",
+        apartment: formData.get("apartment")?.toString() ?? "",
+        city: formData.get("city")?.toString() ?? "",
+        zipcode: formData.get("zipcode")?.toString() ?? "",
+        province: formData.get("province")?.toString() ?? "",
+        country: formData.get("country")?.toString() ?? "",
+        showAddress,
+        showCity,
+        showProvince,
+        showPostalCode,
+        showCountry,
+        offersPickup,
+        offersDelivery,
+      },
+    };
   }
 
   await prisma.location.update({
@@ -42,27 +105,32 @@ export const action = async ({ request, params }) => {
     data: {
       name,
       address,
-      apartment: apartment || "",
-      city: city || "",
-      zipcode: zipcode || "",
-      province: province || "",
-      country: country || "",
-      showAddress: formData.get("showAddress") === "on",
-      showCity: formData.get("showCity") === "on",
-      showProvince: formData.get("showProvince") === "on",
-      showPostalCode: formData.get("showPostalCode") === "on",
-      showCountry: formData.get("showCountry") === "on",
-      offersPickup: formData.get("offersPickup") === "on",
-      offersDelivery: formData.get("offersDelivery") === "on",
+      apartment,
+      city,
+      zipcode,
+      province,
+      country,
+      showAddress,
+      showCity,
+      showProvince,
+      showPostalCode,
+      showCountry,
+      offersPickup,
+      offersDelivery,
     },
   });
 
   return redirect("/app/locations");
-};
+}
 
 export default function EditLocationPage() {
   const { location } = useLoaderData();
   const actionData = useActionData();
+
+  const formValues = {
+    ...location,
+    ...(actionData?.fields ?? {}),
+  };
 
   return (
     <s-page title="Edit location">
@@ -102,7 +170,7 @@ export default function EditLocationPage() {
               <input
                 name="name"
                 type="text"
-                defaultValue={location.name}
+                defaultValue={formValues.name}
                 placeholder="e.g. Main street pickup"
                 style={{
                   borderRadius: "8px",
@@ -117,7 +185,7 @@ export default function EditLocationPage() {
               <textarea
                 name="address"
                 rows={3}
-                defaultValue={location.address}
+                defaultValue={formValues.address}
                 placeholder="123 Market Street"
                 style={{
                   borderRadius: "8px",
@@ -133,7 +201,7 @@ export default function EditLocationPage() {
               <input
                 name="apartment"
                 type="text"
-                defaultValue={location.apartment || ""}
+                defaultValue={formValues.apartment || ""}
                 placeholder="Unit 4B"
                 style={{
                   borderRadius: "8px",
@@ -149,7 +217,7 @@ export default function EditLocationPage() {
                 <input
                   name="city"
                   type="text"
-                  defaultValue={location.city || ""}
+                  defaultValue={formValues.city || ""}
                   style={{
                     borderRadius: "8px",
                     border: "1px solid #cbd5f5",
@@ -162,7 +230,7 @@ export default function EditLocationPage() {
                 <input
                   name="zipcode"
                   type="text"
-                  defaultValue={location.zipcode || ""}
+                  defaultValue={formValues.zipcode || ""}
                   style={{
                     borderRadius: "8px",
                     border: "1px solid #cbd5f5",
@@ -178,7 +246,7 @@ export default function EditLocationPage() {
                 <input
                   name="province"
                   type="text"
-                  defaultValue={location.province || ""}
+                  defaultValue={formValues.province || ""}
                   style={{
                     borderRadius: "8px",
                     border: "1px solid #cbd5f5",
@@ -191,7 +259,7 @@ export default function EditLocationPage() {
                 <input
                   name="country"
                   type="text"
-                  defaultValue={location.country || ""}
+                  defaultValue={formValues.country || ""}
                   style={{
                     borderRadius: "8px",
                     border: "1px solid #cbd5f5",
@@ -205,12 +273,12 @@ export default function EditLocationPage() {
           <div style={{ display: "grid", gap: "12px" }}>
             <h3 style={{ margin: 0 }}>Display options</h3>
             <div style={{ display: "grid", gap: "8px" }}>
-              {[
-                { label: "Show address", name: "showAddress", checked: location.showAddress },
-                { label: "Show city", name: "showCity", checked: location.showCity },
-                { label: "Show province", name: "showProvince", checked: location.showProvince },
-                { label: "Show postal code", name: "showPostalCode", checked: location.showPostalCode },
-                { label: "Show country", name: "showCountry", checked: location.showCountry },
+              {[ 
+                { label: "Show address", name: "showAddress", checked: formValues.showAddress },
+                { label: "Show city", name: "showCity", checked: formValues.showCity },
+                { label: "Show province", name: "showProvince", checked: formValues.showProvince },
+                { label: "Show postal code", name: "showPostalCode", checked: formValues.showPostalCode },
+                { label: "Show country", name: "showCountry", checked: formValues.showCountry },
               ].map((option) => (
                 <label key={option.name} style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                   <input type="checkbox" name={option.name} defaultChecked={Boolean(option.checked)} />
@@ -223,11 +291,11 @@ export default function EditLocationPage() {
           <div style={{ display: "grid", gap: "12px" }}>
             <h3 style={{ margin: 0 }}>Offerings</h3>
             <label style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-              <input type="checkbox" name="offersPickup" defaultChecked={Boolean(location.offersPickup)} />
+              <input type="checkbox" name="offersPickup" defaultChecked={Boolean(formValues.offersPickup)} />
               <span>This location offers local pickup</span>
             </label>
             <label style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-              <input type="checkbox" name="offersDelivery" defaultChecked={Boolean(location.offersDelivery)} />
+              <input type="checkbox" name="offersDelivery" defaultChecked={Boolean(formValues.offersDelivery)} />
               <span>This location offers local delivery</span>
             </label>
           </div>
@@ -238,6 +306,43 @@ export default function EditLocationPage() {
             </s-button>
             <s-button href="/app/locations" variant="secondary">
               Cancel
+            </s-button>
+          </div>
+        </Form>
+
+        <Form
+          method="post"
+          onSubmit={(event) => {
+            if (!window.confirm("Are you sure you want to delete this location?")) {
+              event.preventDefault();
+            }
+          }}
+          style={{
+            border: "1px solid #e3e8ef",
+            borderRadius: "16px",
+            padding: "16px 24px",
+            background: "white",
+            boxShadow: "0 1px 2px rgba(15, 23, 42, 0.08)",
+          }}
+        >
+          <input type="hidden" name="intent" value="delete" />
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "12px",
+              flexWrap: "wrap",
+            }}
+          >
+            <div>
+              <h3 style={{ margin: "0 0 4px 0" }}>Delete location</h3>
+              <p style={{ margin: 0, color: "#64748b" }}>
+                This action cannot be undone.
+              </p>
+            </div>
+            <s-button tone="critical" variant="secondary" type="submit">
+              Delete location
             </s-button>
           </div>
         </Form>
