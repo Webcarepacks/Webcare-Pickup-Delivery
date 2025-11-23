@@ -4,7 +4,7 @@ import { prisma } from "../db.server";
 
 export const loader = async ({ request, params }) => {
   const { session } = await authenticate.admin(request);
-  const shopDomain = session?.shop;
+  const shopDomain = session.shop;
   const id = Number(params.id);
 
   const location = await prisma.location.findFirst({
@@ -20,70 +20,21 @@ export const loader = async ({ request, params }) => {
 
 export const action = async ({ request, params }) => {
   const { session } = await authenticate.admin(request);
-  const shopDomain = session?.shop;
+  const shopDomain = session.shop;
   const id = Number(params.id);
-
-  if (Number.isNaN(id)) {
-    return { error: "Invalid location id." };
-  }
 
   const formData = await request.formData();
 
-  const readText = (field, required = false) => {
-    const value = formData.get(field);
-    if (!value) {
-      return null;
-    }
-    const text = value.toString().trim();
-    if (!text && required) {
-      return null;
-    }
-    return text || null;
-  };
-
-  const name = readText("name", true);
-  const address = readText("address", true);
-  const apartment = readText("apartment");
-  const city = readText("city");
-  const zipcode = readText("zipcode");
-  const province = readText("province");
-  const country = readText("country");
-
-  const showAddress = formData.get("showAddress") === "on";
-  const showCity = formData.get("showCity") === "on";
-  const showProvince = formData.get("showProvince") === "on";
-  const showPostalCode = formData.get("showPostalCode") === "on";
-  const showCountry = formData.get("showCountry") === "on";
-  const offersPickup = formData.get("offersPickup") === "on";
-  const offersDelivery = formData.get("offersDelivery") === "on";
-
-  const fields = {
-    name: formData.get("name")?.toString() ?? "",
-    address: formData.get("address")?.toString() ?? "",
-    apartment: formData.get("apartment")?.toString() ?? "",
-    city: formData.get("city")?.toString() ?? "",
-    zipcode: formData.get("zipcode")?.toString() ?? "",
-    province: formData.get("province")?.toString() ?? "",
-    country: formData.get("country")?.toString() ?? "",
-    showAddress,
-    showCity,
-    showProvince,
-    showPostalCode,
-    showCountry,
-    offersPickup,
-    offersDelivery,
-  };
+  const name = formData.get("name");
+  const address = formData.get("address");
+  const apartment = formData.get("apartment");
+  const city = formData.get("city");
+  const zipcode = formData.get("zipcode");
+  const province = formData.get("province");
+  const country = formData.get("country");
 
   if (!name || !address) {
-    return { error: "Location name and address are required.", fields };
-  }
-
-  const location = await prisma.location.findFirst({
-    where: { id, shopDomain },
-  });
-
-  if (!location) {
-    return { error: "Location not found.", fields };
+    return { error: "Location name and address are required." };
   }
 
   await prisma.location.update({
@@ -91,32 +42,27 @@ export const action = async ({ request, params }) => {
     data: {
       name,
       address,
-      apartment,
-      city,
-      zipcode,
-      province,
-      country,
-      showAddress,
-      showCity,
-      showProvince,
-      showPostalCode,
-      showCountry,
-      offersPickup,
-      offersDelivery,
+      apartment: apartment || "",
+      city: city || "",
+      zipcode: zipcode || "",
+      province: province || "",
+      country: country || "",
+      showAddress: formData.get("showAddress") === "on",
+      showCity: formData.get("showCity") === "on",
+      showProvince: formData.get("showProvince") === "on",
+      showPostalCode: formData.get("showPostalCode") === "on",
+      showCountry: formData.get("showCountry") === "on",
+      offersPickup: formData.get("offersPickup") === "on",
+      offersDelivery: formData.get("offersDelivery") === "on",
     },
   });
 
-  throw redirect("/app/locations");
+  return redirect("/app/locations");
 };
 
 export default function EditLocationPage() {
   const { location } = useLoaderData();
   const actionData = useActionData();
-
-  const formValues = {
-    ...location,
-    ...(actionData?.fields ?? {}),
-  };
 
   return (
     <s-page title="Edit location">
@@ -156,7 +102,7 @@ export default function EditLocationPage() {
               <input
                 name="name"
                 type="text"
-                defaultValue={formValues.name}
+                defaultValue={location.name}
                 placeholder="e.g. Main street pickup"
                 style={{
                   borderRadius: "8px",
@@ -171,7 +117,7 @@ export default function EditLocationPage() {
               <textarea
                 name="address"
                 rows={3}
-                defaultValue={formValues.address}
+                defaultValue={location.address}
                 placeholder="123 Market Street"
                 style={{
                   borderRadius: "8px",
@@ -187,7 +133,7 @@ export default function EditLocationPage() {
               <input
                 name="apartment"
                 type="text"
-                defaultValue={formValues.apartment ?? ""}
+                defaultValue={location.apartment || ""}
                 placeholder="Unit 4B"
                 style={{
                   borderRadius: "8px",
@@ -203,7 +149,7 @@ export default function EditLocationPage() {
                 <input
                   name="city"
                   type="text"
-                  defaultValue={formValues.city ?? ""}
+                  defaultValue={location.city || ""}
                   style={{
                     borderRadius: "8px",
                     border: "1px solid #cbd5f5",
@@ -216,7 +162,7 @@ export default function EditLocationPage() {
                 <input
                   name="zipcode"
                   type="text"
-                  defaultValue={formValues.zipcode ?? ""}
+                  defaultValue={location.zipcode || ""}
                   style={{
                     borderRadius: "8px",
                     border: "1px solid #cbd5f5",
@@ -232,7 +178,7 @@ export default function EditLocationPage() {
                 <input
                   name="province"
                   type="text"
-                  defaultValue={formValues.province ?? ""}
+                  defaultValue={location.province || ""}
                   style={{
                     borderRadius: "8px",
                     border: "1px solid #cbd5f5",
@@ -245,7 +191,7 @@ export default function EditLocationPage() {
                 <input
                   name="country"
                   type="text"
-                  defaultValue={formValues.country ?? ""}
+                  defaultValue={location.country || ""}
                   style={{
                     borderRadius: "8px",
                     border: "1px solid #cbd5f5",
@@ -260,11 +206,11 @@ export default function EditLocationPage() {
             <h3 style={{ margin: 0 }}>Display options</h3>
             <div style={{ display: "grid", gap: "8px" }}>
               {[
-                { label: "Show address", name: "showAddress", checked: formValues.showAddress },
-                { label: "Show city", name: "showCity", checked: formValues.showCity },
-                { label: "Show province", name: "showProvince", checked: formValues.showProvince },
-                { label: "Show postal code", name: "showPostalCode", checked: formValues.showPostalCode },
-                { label: "Show country", name: "showCountry", checked: formValues.showCountry },
+                { label: "Show address", name: "showAddress", checked: location.showAddress },
+                { label: "Show city", name: "showCity", checked: location.showCity },
+                { label: "Show province", name: "showProvince", checked: location.showProvince },
+                { label: "Show postal code", name: "showPostalCode", checked: location.showPostalCode },
+                { label: "Show country", name: "showCountry", checked: location.showCountry },
               ].map((option) => (
                 <label key={option.name} style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                   <input type="checkbox" name={option.name} defaultChecked={Boolean(option.checked)} />
@@ -277,11 +223,11 @@ export default function EditLocationPage() {
           <div style={{ display: "grid", gap: "12px" }}>
             <h3 style={{ margin: 0 }}>Offerings</h3>
             <label style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-              <input type="checkbox" name="offersPickup" defaultChecked={Boolean(formValues.offersPickup)} />
+              <input type="checkbox" name="offersPickup" defaultChecked={Boolean(location.offersPickup)} />
               <span>This location offers local pickup</span>
             </label>
             <label style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-              <input type="checkbox" name="offersDelivery" defaultChecked={Boolean(formValues.offersDelivery)} />
+              <input type="checkbox" name="offersDelivery" defaultChecked={Boolean(location.offersDelivery)} />
               <span>This location offers local delivery</span>
             </label>
           </div>
@@ -290,9 +236,9 @@ export default function EditLocationPage() {
             <s-button type="submit" variant="primary">
               Save changes
             </s-button>
-            <a href="/app/locations" style={{ color: "#334155", textDecoration: "none" }}>
+            <s-button href="/app/locations" variant="secondary">
               Cancel
-            </a>
+            </s-button>
           </div>
         </Form>
       </div>
