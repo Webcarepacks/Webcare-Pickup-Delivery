@@ -32,25 +32,29 @@ model Session {
 }
 
 model Location {
-  id          Int      @id @default(autoincrement())
-  shopDomain  String
-  name        String
-  address     String
-  apartment   String?
-  city        String?
-  zipcode     String?
-  province    String?
-  country     String?
-  active      Boolean  @default(true)
+  id         Int      @id @default(autoincrement())
+  shopDomain String
+  name       String
+  address    String
+
+  apartment String?
+  city      String?
+  zipcode   String?
+  province  String?
+  country   String?
+
   showAddress    Boolean @default(true)
   showCity       Boolean @default(true)
   showProvince   Boolean @default(true)
   showPostalCode Boolean @default(true)
   showCountry    Boolean @default(true)
+
   offersPickup   Boolean @default(false)
   offersDelivery Boolean @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([shopDomain])
 }
