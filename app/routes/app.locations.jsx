@@ -464,11 +464,9 @@ export default function LocationsPage() {
                       flexWrap: "wrap",
                     }}
                   >
-                    <Form method="get" action={`/app/locations/${location.id}`}>
-                      <s-button type="submit" variant="secondary">
-                        Edit
-                      </s-button>
-                    </Form>
+                    <s-button href={`/app/locations/${location.id}`} variant="secondary">
+                      Edit
+                    </s-button>
                     <Form
                       method="post"
                       onSubmit={(event) => {
